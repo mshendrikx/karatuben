@@ -4,10 +4,10 @@ FROM python:3.11-bullseye
 # Set working directory
 WORKDIR /app
 
-RUN mkdir songs
+RUN mkdir songs logs
 
-RUN apt-get update && apt-get upgrade
-RUN apt-get install  -y 
+#RUN apt-get update && apt-get upgrade
+#RUN apt-get install  -y 
 
 # Copy project files
 COPY . .
