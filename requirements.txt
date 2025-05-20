@@ -1,6 +1,8 @@
+Flask
 sqlalchemy
 mysql-connector-python
 pymysql
 pytubefix
 psutil
 python-dotenv
+pika

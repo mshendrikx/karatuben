@@ -1,15 +1,13 @@
 import os
 import logging
+import pika
 
-from flask import Flask, jsonify, request
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from pytubefix import YouTube
 from dotenv import load_dotenv
-
-app = Flask(__name__)
 
 load_dotenv()
 
@@ -22,6 +20,7 @@ logger = logging.getLogger(__name__)
 YT_BASE_URL = "https://www.youtube.com/watch?v="
 
 Base = declarative_base()
+
 
 class Song(Base):
     __tablename__ = "song"
@@ -52,12 +51,11 @@ def get_session():
 
     return session
 
-@app.route('/youtube_download/<youtubeid>', methods=['GET'])
-def youtube_download(youtubeid):
-    
+def callback(ch, method, properties, body):    
+
     #logger.info("Starting connection with db")
     session = get_session()
-    song = session.query(Song).filter_by(youtubeid=youtubeid).first()
+    song = session.query(Song).filter_by(youtubeid=body).first()
     if song:
         video_file = str(song.youtubeid) + ".mp4"
         video_path = "/app/songs"
@@ -69,11 +67,17 @@ def youtube_download(youtubeid):
             )
             song.downloaded = 1
             session.commit() 
-            status = "success"
-
+            
         except Exception as e:
-            status = "error"
-        
+            1 == 1 
+            
     session.close()
-        
-    return jsonify({"status": status})
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(os.environ.get("RABBITMQ_HOST")))
+channel = connection.channel()
+channel.queue_declare(queue='youtube_download')
+channel.basic_consume(queue='youtube_download',
+                      auto_ack=True,
+                      on_message_callback=callback)
+
+channel.start_consuming()

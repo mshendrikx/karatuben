@@ -1,15 +1,13 @@
 import os
+import time
 import logging
 
-from flask import Flask, jsonify, request
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from pytubefix import YouTube
 from dotenv import load_dotenv
-
-app = Flask(__name__)
 
 load_dotenv()
 
@@ -22,6 +20,7 @@ logger = logging.getLogger(__name__)
 YT_BASE_URL = "https://www.youtube.com/watch?v="
 
 Base = declarative_base()
+
 
 class Song(Base):
     __tablename__ = "song"
@@ -52,28 +51,39 @@ def get_session():
 
     return session
 
-@app.route('/youtube_download/<youtubeid>', methods=['GET'])
-def youtube_download(youtubeid):
-    
+
+while 1 == 1:
+
     #logger.info("Starting connection with db")
     session = get_session()
-    song = session.query(Song).filter_by(youtubeid=youtubeid).first()
-    if song:
-        video_file = str(song.youtubeid) + ".mp4"
-        video_path = "/app/songs"
-        download_url = YT_BASE_URL + str(song.youtubeid)
-        try:
-            #logger.info("Downloading video: " + song.artist + " - " + song.name) 
-            YouTube(download_url).streams.first().download(
-                output_path=video_path, filename=video_file
-            )
-            song.downloaded = 1
-            session.commit() 
-            status = "success"
+    
+    #if not session:
+    #    logger.info("Error connecting to database")
 
-        except Exception as e:
-            status = "error"
-        
+    count = 0
+    while count < 6:
+
+        songs = session.query(Song).filter_by(downloaded=0)
+
+        for song in songs:
+
+            video_file = str(song.youtubeid) + ".mp4"
+            video_path = "/app/songs"
+            download_url = YT_BASE_URL + str(song.youtubeid)
+            try:
+                #logger.info("Downloading video: " + song.artist + " - " + song.name) 
+                YouTube(download_url).streams.first().download(
+                    output_path=video_path, filename=video_file
+                )
+            except Exception as e:
+                #logger.info("Error downloading video: ", e)
+                continue
+            
+            song.downloaded = 1
+            session.commit()
+
+        time.sleep(int(os.environ.get("TIME_SLEEP")))
+        count += 1
+
+    #logger.info("Closing connection with db")
     session.close()
-        
-    return jsonify({"status": status})
