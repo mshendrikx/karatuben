@@ -61,8 +61,6 @@ def get_session():
 
 while 1 == 1:
 
-    if ACTIVE_LOGGER:
-        logger.info("Starting connection with db")
     session = get_session()
     
     if not session:
@@ -87,7 +85,7 @@ while 1 == 1:
                 )
             except Exception as e:
                 if ACTIVE_LOGGER:
-                    logger.info("Error downloading video: " + e.error_string)
+                    logger.error("Error downloading video: " + e.error_string)
                 continue           
             
             if ACTIVE_LOGGER:
@@ -97,8 +95,5 @@ while 1 == 1:
 
         time.sleep(int(os.environ.get("TIME_SLEEP")))
         count += 1
-        
-    if ACTIVE_LOGGER:
-        logger.info("Closing connection with db")
         
     session.close()
