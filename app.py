@@ -11,6 +11,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+ACTIVE_LOGGER = os.getenv("ACTIVE_LOGGER", "False")
+
+if ACTIVE_LOGGER == "True":
+    ACTIVE_LOGGER = True
+else:
+    ACTIVE_LOGGER = False
+
 logging.basicConfig(filename='/app/logs/karatuben.log', level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -54,11 +61,13 @@ def get_session():
 
 while 1 == 1:
 
-    #logger.info("Starting connection with db")
+    if ACTIVE_LOGGER:
+        logger.info("Starting connection with db")
     session = get_session()
     
-    #if not session:
-    #    logger.info("Error connecting to database")
+    if not session:
+        if ACTIVE_LOGGER:
+            logger.info("Error connecting to database")
 
     count = 0
     while count < 6:
@@ -71,19 +80,25 @@ while 1 == 1:
             video_path = "/app/songs"
             download_url = YT_BASE_URL + str(song.youtubeid)
             try:
-                #logger.info("Downloading video: " + song.artist + " - " + song.name) 
+                if ACTIVE_LOGGER:
+                    logger.info("Downloading video: " + song.artist + " - " + song.name) 
                 YouTube(download_url).streams.first().download(
                     output_path=video_path, filename=video_file
                 )
             except Exception as e:
-                #logger.info("Error downloading video: ", e)
-                continue
+                if ACTIVE_LOGGER:
+                    logger.info("Error downloading video: " + e.error_string)
+                continue           
             
+            if ACTIVE_LOGGER:
+                logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
             song.downloaded = 1
             session.commit()
 
         time.sleep(int(os.environ.get("TIME_SLEEP")))
         count += 1
-
-    #logger.info("Closing connection with db")
+        
+    if ACTIVE_LOGGER:
+        logger.info("Closing connection with db")
+        
     session.close()
