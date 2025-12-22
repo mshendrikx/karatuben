@@ -42,12 +42,14 @@ def get_session():
     try:
         mariadb_pass = os.environ.get("MYSQL_ROOT_PASSWORD")
         mariadb_host = os.environ.get("MYSQL_HOST")
+        mariadb_database = os.environ.get("MYSQL_DATABASE")
         engine_string = (
             "mysql+pymysql://root:"
             + str(mariadb_pass)
             + "@"
             + str(mariadb_host)
-            + "/karatube"
+            + "/"
+            + str(mariadb_database)
         )
         engine = create_engine(engine_string)
     except Exception as e:
