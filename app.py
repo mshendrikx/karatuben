@@ -107,13 +107,15 @@ def normalize_video(filename):
     
     return True
 
-while 1 == 1:
-
-    session = get_session()
-    
+while 1 == 1:   
+   
     if not session:
-        if ACTIVE_LOGGER:
-            logger.info("Error connecting to database")
+        session = get_session()
+        
+        if not session:
+            if ACTIVE_LOGGER:
+                logger.info("Error connecting to database")
+            time.sleep(int(os.environ.get("TIME_SLEEP")))
             continue
 
     songs = session.query(Song).filter_by(downloaded=0)
