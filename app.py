@@ -34,7 +34,6 @@ TARGET_LUFS = -14
 
 Base = declarative_base()
 
-
 class Song(Base):
     __tablename__ = "song"
     youtubeid = Column(String(100), primary_key=True)
@@ -42,7 +41,6 @@ class Song(Base):
     artist = Column(String(100))
     downloaded = Column(Integer)
     
-
 
 def get_session():
 
@@ -72,7 +70,8 @@ def normalize_video(filename):
     input_path = os.path.join(DOWNLOAD_FOLDER, filename)
     output_path = os.path.join(OUTPUT_FOLDER, filename)
     
-    logger.info(f"Processing: {filename}...")    
+    if ACTIVE_LOGGER:
+        logger.info(f"Processing: {filename}...")    
 
     # Construct the FFmpeg command
     # We pass the command as a LIST of strings. This is safer and 
@@ -90,18 +89,22 @@ def normalize_video(filename):
         # capture_output=True keeps your terminal clean.
         subprocess.run(command, check=True, capture_output=True)
 
-        # Delete the original file
-        os.remove(input_path)
-                
     except subprocess.CalledProcessError as e:
-        os.remove(input_path)
-        logger.error(f"   -> ERROR processing {filename}.") 
-        # Print the specific error from FFmpeg if it fails
-        logger.error(f"   Error details: {e.stderr.decode()}")
+        if ACTIVE_LOGGER:
+            logger.error(f"   -> ERROR processing {filename}.") 
+            # Print the specific error from FFmpeg if it fails
+            logger.error(f"   Error details: {e.stderr.decode()}")
+
+        # Delete the original file
+        os.remove(input_path)    
  
         return False
+
+    # Delete the original file
+    os.remove(input_path)    
+    if ACTIVE_LOGGER:
+        logger.info("Video" + filename + " normalized.")     
     
-    logger.info("Video" + filename + " normalized.")     
     return True
 
 while 1 == 1:
@@ -135,11 +138,11 @@ while 1 == 1:
             
             if ACTIVE_LOGGER:
                 logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
-            song.downloaded = 1
-            session.commit()
             
-            normalize_video(video_file)
-
+            if normalize_video(video_file):
+                song.downloaded = 1
+                session.commit()
+            
         time.sleep(int(os.environ.get("TIME_SLEEP")))
         count += 1
         
