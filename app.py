@@ -114,36 +114,33 @@ while 1 == 1:
     if not session:
         if ACTIVE_LOGGER:
             logger.info("Error connecting to database")
+            continue
 
-    count = 0
-    while count < 6:
-
-        songs = session.query(Song).filter_by(downloaded=0)
-
-        for song in songs:
-
-            video_file = str(song.youtubeid) + ".mp4"
-            video_path = DOWNLOAD_FOLDER
-            download_url = YT_BASE_URL + str(song.youtubeid)
-            try:
-                if ACTIVE_LOGGER:
-                    logger.info("Downloading video: " + song.artist + " - " + song.name) 
-                YouTube(download_url).streams.first().download(
-                    output_path=video_path, filename=video_file
-                )
-            except Exception as e:
-                if ACTIVE_LOGGER:
-                    logger.error("Error downloading video: " + e.error_string)
-                continue           
-            
+    songs = session.query(Song).filter_by(downloaded=0)
+    for song in songs:
+        video_file = str(song.youtubeid) + ".mp4"
+        video_path = DOWNLOAD_FOLDER
+        download_url = YT_BASE_URL + str(song.youtubeid)
+        try:
             if ACTIVE_LOGGER:
-                logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
+                logger.info("Downloading video: " + song.artist + " - " + song.name) 
+            YouTube(download_url).streams.first().download(
+                output_path=video_path, filename=video_file
+            )
             
-            if normalize_video(video_file):
-                song.downloaded = 1
-                session.commit()
-            
-        time.sleep(int(os.environ.get("TIME_SLEEP")))
-        count += 1
+        except Exception as e:
+            if ACTIVE_LOGGER:
+                logger.error("Error downloading video: " + e.error_string)
+            continue           
+        
+        if ACTIVE_LOGGER:
+            logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
+        
+        if normalize_video(video_file):
+            song.downloaded = 1
+            session.commit()
+        
+    time.sleep(int(os.environ.get("TIME_SLEEP")))
+    count += 1
         
     session.close()

@@ -4,7 +4,7 @@ FROM python:3.11-bullseye
 # Set working directory
 WORKDIR /app
 
-RUN mkdir songs logs
+RUN mkdir songs logs downloads
 
 #RUN apt-get update && apt-get upgrade
 #RUN apt-get install  -y 
