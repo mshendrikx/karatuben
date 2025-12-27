@@ -103,20 +103,20 @@ def normalize_video(filename):
     # Delete the original file
     os.remove(input_path)    
     if ACTIVE_LOGGER:
-        logger.info("Video" + filename + " normalized.")     
+        logger.info("Video " + filename + " normalized.")
     
     return True
 
+session = None 
+
 while 1 == 1:   
    
+    session = get_session()
     if not session:
-        session = get_session()
-        
-        if not session:
-            if ACTIVE_LOGGER:
-                logger.info("Error connecting to database")
-            time.sleep(int(os.environ.get("TIME_SLEEP")))
-            continue
+        if ACTIVE_LOGGER:
+            logger.info("Error connecting to database")
+        time.sleep(int(os.environ.get("TIME_SLEEP")))
+        continue
 
     songs = session.query(Song).filter_by(downloaded=0)
     for song in songs:
@@ -130,6 +130,8 @@ while 1 == 1:
                 output_path=video_path, filename=video_file
             )
             
+            time.sleep(int(os.environ.get("TIME_SLEEP")))
+            
         except Exception as e:
             if ACTIVE_LOGGER:
                 logger.error("Error downloading video: " + e.error_string)
@@ -138,11 +140,13 @@ while 1 == 1:
         if ACTIVE_LOGGER:
             logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
         
-        if normalize_video(video_file):
+        if normalize_video(video_file) == True:
+            time.sleep(int(os.environ.get("TIME_SLEEP")))
             song.downloaded = 1
             session.commit()
         
-    time.sleep(int(os.environ.get("TIME_SLEEP")))
-    count += 1
-        
     session.close()
+    time.sleep(int(os.environ.get("TIME_SLEEP")))
+
+
+
