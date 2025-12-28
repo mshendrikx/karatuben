@@ -67,6 +67,10 @@ def get_session():
 def normalize_video(filename):
 
     input_path = os.path.join(DOWNLOAD_FOLDER, filename)
+    
+    if not os.path.exists(input_path):
+        return False
+    
     output_path = os.path.join(OUTPUT_FOLDER, filename)
     
     if ACTIVE_LOGGER:
@@ -105,12 +109,12 @@ def normalize_video(filename):
             logger.error(f"   Error details: {e.stderr.decode()}")
 
         # Delete the original file
-        os.remove(input_path)    
+        #os.remove(input_path)    
  
         return False
 
     # Delete the original file
-    os.remove(input_path)    
+    #os.remove(input_path)    
     if ACTIVE_LOGGER:
         logger.info("Video " + filename + " normalized.")
     
@@ -127,27 +131,34 @@ while 1 == 1:
         time.sleep(int(os.environ.get("TIME_SLEEP")))
         continue
 
-    songs = session.query(Song).filter_by(downloaded=0)
+    songs = session.query(Song).all()
     for song in songs:
         video_file = str(song.youtubeid) + ".mp4"
+        check_path = os.path.join(OUTPUT_FOLDER, video_file)
+        if os.path.exists(check_path):
+            if ACTIVE_LOGGER:
+                logger.info("Video: " + song.artist + " - " + song.name + " already exists")
+            continue
+
         video_path = DOWNLOAD_FOLDER
-        download_url = YT_BASE_URL + str(song.youtubeid)
-        try:
-            if ACTIVE_LOGGER:
-                logger.info("Downloading video: " + song.artist + " - " + song.name) 
-            YouTube(download_url).streams.first().download(
-                output_path=video_path, filename=video_file
-            )
-            
-            time.sleep(int(os.environ.get("TIME_SLEEP")))
-            
-        except Exception as e:
-            if ACTIVE_LOGGER:
-                logger.error("Error downloading video: " + e.error_string)
-            continue           
         
-        if ACTIVE_LOGGER:
-            logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
+        download_url = YT_BASE_URL + str(song.youtubeid)
+        #try:
+        #    if ACTIVE_LOGGER:
+        #        logger.info("Downloading video: " + song.artist + " - " + song.name) 
+        #    YouTube(download_url).streams.first().download(
+        #        output_path=video_path, filename=video_file
+        #    )
+        #    
+        #    time.sleep(int(os.environ.get("TIME_SLEEP")))
+        #    
+        #except Exception as e:
+        #    if ACTIVE_LOGGER:
+        #        logger.error("Error downloading video: " + e.error_string)
+        #    continue           
+        #
+        #if ACTIVE_LOGGER:
+        #    logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
         
         if normalize_video(video_file) == True:
             time.sleep(int(os.environ.get("TIME_SLEEP")))
