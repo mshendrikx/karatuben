@@ -6,3 +6,4 @@ pytubefix
 psutil
 python-dotenv
 pika
+ffmpeg-normalize

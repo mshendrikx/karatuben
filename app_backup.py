@@ -127,17 +127,10 @@ while 1 == 1:
         time.sleep(int(os.environ.get("TIME_SLEEP")))
         continue
 
-    songs = session.query(Song).all()
+    songs = session.query(Song).filter_by(downloaded=0)
     for song in songs:
         video_file = str(song.youtubeid) + ".mp4"
-        check_path = os.path.join(OUTPUT_FOLDER, video_file)
-        if os.path.exists(check_path):
-            if ACTIVE_LOGGER:
-                logger.info("Video: " + song.artist + " - " + song.name + " already exists")
-            continue
-
         video_path = DOWNLOAD_FOLDER
-        
         download_url = YT_BASE_URL + str(song.youtubeid)
         try:
             if ACTIVE_LOGGER:
