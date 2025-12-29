@@ -1,6 +1,5 @@
 Flask
-sqlalchemy
-mysql-connector-python
+flask-sqlalchemy
 pymysql
 pytubefix
 psutil

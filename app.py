@@ -2,160 +2,147 @@ import os
 import time
 import logging
 import subprocess
-import shutil
+import dotenv
 
-from pathlib import Path
-from sqlalchemy import create_engine
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
 from pytubefix import YouTube
-from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from flask import Flask
 
-load_dotenv()
-
-ACTIVE_LOGGER = os.getenv("ACTIVE_LOGGER", "False")
-
-if ACTIVE_LOGGER == "True":
-    ACTIVE_LOGGER = True
-else:
-    ACTIVE_LOGGER = False
-
-logging.basicConfig(filename='/app/logs/karatuben.log', level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Create a logger
-logger = logging.getLogger(__name__)
+dotenv.load_dotenv()
 
 YT_BASE_URL = "https://www.youtube.com/watch?v="
 DOWNLOAD_FOLDER = "/app/downloads"
 OUTPUT_FOLDER = "/app/songs"
-TARGET_LUFS = "-16"
+TARGET_LUFS = os.getenv("TARGET_LUFS", "-16")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "NOTSET")
 
-Base = declarative_base()
+db = SQLAlchemy()
 
-class Song(Base):
-    __tablename__ = "song"
-    youtubeid = Column(String(100), primary_key=True)
-    name = Column(String(100))
-    artist = Column(String(100))
-    downloaded = Column(Integer)
-        
-def get_session():
 
-    try:
-        mariadb_pass = os.environ.get("MYSQL_ROOT_PASSWORD")
-        mariadb_host = os.environ.get("MYSQL_HOST")
-        mariadb_database = os.environ.get("MYSQL_DATABASE")
-        engine_string = (
-            "mysql+pymysql://root:"
-            + str(mariadb_pass)
-            + "@"
-            + str(mariadb_host)
-            + "/"
-            + str(mariadb_database)
-        )
-        engine = create_engine(engine_string)
-    except Exception as e:
-        return None
+class Song(db.Model):
+    youtubeid = db.Column(db.String(100), primary_key=True)
+    name = db.Column(db.String(100))
+    artist = db.Column(db.String(100))
+    downloaded = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(
+        db.DateTime,
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
 
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
-    return session
+if LOG_LEVEL == "DEBUG":
+    log_level = logging.DEBUG
+elif LOG_LEVEL == "INFO":
+    log_level = logging.INFO
+elif LOG_LEVEL == "WARN":
+    log_level = logging.WARN
+elif LOG_LEVEL == "ERROR":
+    log_level = logging.ERROR
+elif LOG_LEVEL == "FATAL":
+    log_level = logging.FATAL
+else:
+    log_level = logging.NOTSET
+
+logging.basicConfig(
+    filename="/app/logs/karatuben.log",
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+# Create a logger
+logger = logging.getLogger(__name__)
+
 
 def normalize_video(filename):
 
     input_path = os.path.join(DOWNLOAD_FOLDER, filename)
     output_path = os.path.join(OUTPUT_FOLDER, filename)
-    
-    if ACTIVE_LOGGER:
-        logger.info(f"Processing: {filename}...")    
 
-    # Construct the FFmpeg command
-    # We pass the command as a LIST of strings. This is safer and 
-    # handles filenames with spaces (common in Karaoke) automatically.
-    #command = [
-    #    "ffmpeg",
-    #    "-y",                     # Overwrite output file without asking
-    #    "-i", input_path,         # Input file
-    #    "-c:v", "copy",           # Copy video stream (NO re-encoding)
-    #    "-af", f"loudnorm=I={TARGET_LUFS}:TP=-1.5:LRA=11", # Audio Filter
-    #    output_path               # Output file
-    #]
     command = [
         "ffmpeg-normalize",
         input_path,
-        "-c:a", "aac",
-        "-b:a", "256k",
-        "-nt", "ebu",
-        "-t", TARGET_LUFS,
-        "-o", output_path
+        "-c:a",
+        "aac",
+        "-b:a",
+        "256k",
+        "-nt",
+        "ebu",
+        "-t",
+        TARGET_LUFS,
+        "-o",
+        output_path,
     ]
-    
+
     try:
         # Run the command and hide the massive wall of text FFmpeg usually spits out
         # capture_output=True keeps your terminal clean.
         subprocess.run(command, check=True, capture_output=True)
 
     except subprocess.CalledProcessError as e:
-        if ACTIVE_LOGGER:
-            logger.error(f"   -> ERROR processing {filename}.") 
-            # Print the specific error from FFmpeg if it fails
-            logger.error(f"   Error details: {e.stderr.decode()}")
+        logger.error(f"   -> ERROR processing {filename}.")
+        # Print the specific error from FFmpeg if it fails
+        logger.error(f"   Error details: {e.stderr.decode()}")
 
         # Delete the original file
-        os.remove(input_path)    
- 
+        os.remove(input_path)
+
         return False
 
     # Delete the original file
-    os.remove(input_path)    
-    if ACTIVE_LOGGER:
-        logger.info("Video " + filename + " normalized.")
-    
+    os.remove(input_path)
+
     return True
 
-session = None 
 
-while 1 == 1:   
-   
-    session = get_session()
-    if not session:
-        if ACTIVE_LOGGER:
-            logger.info("Error connecting to database")
-        time.sleep(int(os.environ.get("TIME_SLEEP")))
-        continue
+logger.info("Starting Karatuben.")
 
-    songs = session.query(Song).filter_by(downloaded=0)
-    for song in songs:
-        video_file = str(song.youtubeid) + ".mp4"
-        video_path = DOWNLOAD_FOLDER
-        download_url = YT_BASE_URL + str(song.youtubeid)
-        try:
-            if ACTIVE_LOGGER:
-                logger.info("Downloading video: " + song.artist + " - " + song.name) 
-            YouTube(download_url).streams.first().download(
-                output_path=video_path, filename=video_file
-            )
-            
-            time.sleep(int(os.environ.get("TIME_SLEEP")))
-            
-        except Exception as e:
-            if ACTIVE_LOGGER:
+app = Flask(__name__)
+
+db_user = os.environ.get("MYSQL_USER", "root")
+db_pass = os.environ.get("MYSQL_ROOT_PASSWORD")
+db_host = os.environ.get("MYSQL_HOST")
+db_port = os.environ.get("MYSQL_PORT", "3306")
+db_name = os.environ.get("MYSQL_DATABASE", "karatube")
+db_url = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+db.init_app(app)
+
+with app.app_context():
+
+    while 1 == 1:
+
+        songs = Song.query.filter_by(downloaded=0)
+        for song in songs:
+            video_file = str(song.youtubeid) + ".mp4"
+            video_path = DOWNLOAD_FOLDER
+            download_url = YT_BASE_URL + str(song.youtubeid)
+            try:
+                logger.info("Downloading video: " + song.artist + " - " + song.name)
+                YouTube(download_url).streams.first().download(
+                    output_path=video_path, filename=video_file
+                )
+                logger.info("Video: " + song.artist + " - " + song.name + " downloaded")
+                time.sleep(int(os.environ.get("TIME_SLEEP")))
+
+            except Exception as e:
                 logger.error("Error downloading video: " + e.error_string)
-            continue           
-        
-        if ACTIVE_LOGGER:
-            logger.info("Video: " + song.artist + " - " + song.name + " downloaded") 
-        
-        if normalize_video(video_file) == True:
-            time.sleep(int(os.environ.get("TIME_SLEEP")))
-            song.downloaded = 1
-            session.commit()
+                continue
 
-    session.close()
-    time.sleep(int(os.environ.get("TIME_SLEEP")))
+            logger.info("Video: " + song.artist + " - " + song.name + " normalizing.")
+            if normalize_video(video_file) == True:
+                time.sleep(int(os.environ.get("TIME_SLEEP")))
+                logger.info(
+                    "Video: " + song.artist + " - " + song.name + " normalized."
+                )
+                updated_song = Song.query.filter_by(youtubeid=song.youtubeid).first()
+                updated_song.downloaded = 1
+                db.session.commit()
+            else:
+                logger.error(
+                    "Video: " + song.artist + " - " + song.name + " not normalized."
+                )
 
-
-
+        time.sleep(int(os.environ.get("TIME_SLEEP")))
