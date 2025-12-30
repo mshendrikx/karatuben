@@ -17,6 +17,9 @@ RUN mkdir songs logs downloads
 # Copy project files
 COPY . .
 
+# Expose port 5001 for web traffic
+EXPOSE 5001
+
 # Specify the command to run when the container starts
 CMD ["python3", "app.py"]  
 # Replace "app.py" with your main script
