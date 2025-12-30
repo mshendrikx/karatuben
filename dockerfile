@@ -18,7 +18,7 @@ RUN mkdir songs logs downloads
 COPY . .
 
 # Expose port 5001 for web traffic
-EXPOSE 5001
+#EXPOSE 5001
 
 # Specify the command to run when the container starts
 CMD ["python3", "app.py"]  

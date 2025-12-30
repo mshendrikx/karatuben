@@ -1,0 +1,13 @@
+*.pyc
+*.swp
+.env
+.vscode/
+.venv/
+__pycache__/
+passwords.txt
+app.sh
+debug.py
+test.py
+test2.py
+credentials.json
+build.sh
