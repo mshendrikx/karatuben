@@ -9,6 +9,9 @@ def normalize_video(filename):
 
     input_path = os.path.join(SOURCE_FOLDER, filename)
     output_path = os.path.join(DEST_FOLDER, filename)
+    
+    if os.path.exists(output_path):
+        return True
 
     command = [
         "ffmpeg-normalize",
