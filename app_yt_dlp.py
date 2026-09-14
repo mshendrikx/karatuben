@@ -61,7 +61,7 @@ def download_video(video_id: str, output_path: str, filename: str) -> None:
 
     ydl_opts = {
         "outtmpl": download_target,
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo[ext=mp4]+bestaudio/best",
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,

@@ -8,7 +8,7 @@ from pytubefix import YouTube
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 
-dotenv.load_dotenv()
+#dotenv.load_dotenv()
 
 YT_BASE_URL = "https://www.youtube.com/watch?v="
 DOWNLOAD_FOLDER = os.getenv("DOWNLOAD_FOLDER", "/app/downloads")
