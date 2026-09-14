@@ -1,6 +1,7 @@
 Flask
 flask-sqlalchemy
 pymysql
+yt-dlp
 pytubefix
 psutil
 python-dotenv

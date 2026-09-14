@@ -6,7 +6,7 @@ import dotenv
 
 from pytubefix import YouTube
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, request, jsonify
+from flask import Flask
 
 dotenv.load_dotenv()
 
@@ -55,23 +55,6 @@ logging.basicConfig(
 # Create a logger
 logger = logging.getLogger(__name__)
 
-logger.info("Starting Karatuben.")
-
-app = Flask(__name__)
-app.config["SECRET_KEY"] = os.urandom(24).hex()
-
-db_user = os.environ.get("MYSQL_USER", "root")
-db_pass = os.environ.get("MYSQL_ROOT_PASSWORD")
-db_host = os.environ.get("MYSQL_HOST")
-db_port = os.environ.get("MYSQL_PORT", "3306")
-db_name = os.environ.get("MYSQL_DATABASE", "karatube")
-db_url = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-db.init_app(app)
-
-logger.info("Karatuben started.")
-
 
 def normalize_video(filename):
 
@@ -109,43 +92,63 @@ def normalize_video(filename):
         return False
 
     # Delete the original file
-    os.remove(input_path)
+    try:
+        os.remove(input_path)
+    except Exception as e:
+        logger.error(f"   -> ERROR deleting {filename}.")
+        # Print the specific error from FFmpeg if it fails
+        logger.error(f"   Error details: {e.stderr.decode()}")
 
     return True
 
 
-@app.route("/api/download_karaoke", methods=["POST"])
-def download_karaoke():
+logger.info("Starting Karatuben.")
 
-    data = request.get_json()
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.urandom(24).hex()
 
-    # Basic validation: ensure title and author exist
-    if not data or "youtubeid" not in data:
-        return jsonify({"error": "Missing youtubeid"}), 400
+db_user = os.environ.get("MYSQL_USER", "root")
+db_pass = os.environ.get("MYSQL_ROOT_PASSWORD")
+db_host = os.environ.get("MYSQL_HOST")
+db_port = os.environ.get("MYSQL_PORT", "3306")
+db_name = os.environ.get("MYSQL_DATABASE", "karatube")
+db_url = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
 
-    youtubeid = data["youtubeid"]
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+db.init_app(app)
 
-    video_file = str(youtubeid) + ".mp4"
-    video_path = DOWNLOAD_FOLDER
-    download_url = YT_BASE_URL + str(youtubeid)
-    try:
-        logger.info("Video: " + youtubeid + " - downloading.")
-        YouTube(download_url).streams.first().download(
-            output_path=video_path, filename=video_file
-        )
-        logger.info("Video: " + youtubeid + " - downloaded.")
-    except Exception as e:
-        logger.error("Error downloading video: " + str(e))
-        return jsonify({"error": "Error downloading video"}), 500
+logger.info("Karatuben started.")
 
-    logger.info("Video: " + youtubeid + " - normalizing.")
-    if normalize_video(video_file) == True:
-        logger.info("Video: " + youtubeid + " - normalized.")
-    else:
-        logger.error("Video: " + youtubeid + " - failed.")
+while 1 == 1:
 
-    return jsonify({"message": "Song added successfully", "youtubeid": youtubeid}), 201
+    with app.app_context():
+        songs = Song.query.filter_by(downloaded=0)
+        for song in songs:
+            video_file = str(song.youtubeid) + ".mp4"
+            video_path = DOWNLOAD_FOLDER
+            download_url = YT_BASE_URL + str(song.youtubeid)
+            try:
+                logger.info(
+                    "Video: " + song.artist + " - " + song.name + " - downloading."
+                )
+                YouTube(download_url).streams.first().download(
+                    output_path=video_path, filename=video_file
+                )
+                logger.info(
+                    "Video: " + song.artist + " - " + song.name + " - downloaded."
+                )
+            except Exception as e:
+                logger.error("Error downloading video: " + e.error_string)
+                continue
+            logger.info("Video: " + song.artist + " - " + song.name + " - normalizing.")
+            if normalize_video(video_file) == True:
+                logger.info(
+                    "Video: " + song.artist + " - " + song.name + " - normalized."
+                )
+                updated_song = Song.query.filter_by(youtubeid=song.youtubeid).first()
+                updated_song.downloaded = 1
+                db.session.commit()
+            else:
+                logger.error("Video: " + song.artist + " - " + song.name + " - failed.")
 
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5001, host="0.0.0.0")
+    time.sleep(int(os.environ.get("TIME_SLEEP")))

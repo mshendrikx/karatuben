@@ -4,7 +4,7 @@ import logging
 import subprocess
 import dotenv
 
-from pytubefix import YouTube
+import yt_dlp
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 
@@ -52,12 +52,27 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# Create a logger
 logger = logging.getLogger(__name__)
 
 
-def normalize_video(filename):
+def download_video(video_id: str, output_path: str, filename: str) -> None:
+    url = YT_BASE_URL + str(video_id)
+    download_target = os.path.join(output_path, filename)
 
+    ydl_opts = {
+        "outtmpl": download_target,
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "merge_output_format": "mp4",
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+
+def normalize_video(filename):
     input_path = os.path.join(DOWNLOAD_FOLDER, filename)
     output_path = os.path.join(OUTPUT_FOLDER, filename)
 
@@ -77,27 +92,17 @@ def normalize_video(filename):
     ]
 
     try:
-        # Run the command and hide the massive wall of text FFmpeg usually spits out
-        # capture_output=True keeps your terminal clean.
         subprocess.run(command, check=True, capture_output=True)
-
     except subprocess.CalledProcessError as e:
         logger.error(f"   -> ERROR processing {filename}.")
-        # Print the specific error from FFmpeg if it fails
         logger.error(f"   Error details: {e.stderr.decode()}")
-
-        # Delete the original file
         os.remove(input_path)
-
         return False
 
-    # Delete the original file
     try:
         os.remove(input_path)
-    except Exception as e:
+    except Exception:
         logger.error(f"   -> ERROR deleting {filename}.")
-        # Print the specific error from FFmpeg if it fails
-        logger.error(f"   Error details: {e.stderr.decode()}")
 
     return True
 
@@ -119,29 +124,26 @@ db.init_app(app)
 
 logger.info("Karatuben started.")
 
-while 1 == 1:
-
+while True:
     with app.app_context():
         songs = Song.query.filter_by(downloaded=0)
         for song in songs:
             video_file = str(song.youtubeid) + ".mp4"
             video_path = DOWNLOAD_FOLDER
-            download_url = YT_BASE_URL + str(song.youtubeid)
             try:
                 logger.info(
                     "Video: " + song.artist + " - " + song.name + " - downloading."
                 )
-                YouTube(download_url).streams.first().download(
-                    output_path=video_path, filename=video_file
-                )
+                download_video(song.youtubeid, video_path, video_file)
                 logger.info(
                     "Video: " + song.artist + " - " + song.name + " - downloaded."
                 )
             except Exception as e:
-                logger.error("Error downloading video: " + e.error_string)
+                logger.error("Error downloading video: %s", e)
                 continue
+
             logger.info("Video: " + song.artist + " - " + song.name + " - normalizing.")
-            if normalize_video(video_file) == True:
+            if normalize_video(video_file):
                 logger.info(
                     "Video: " + song.artist + " - " + song.name + " - normalized."
                 )
@@ -151,4 +153,4 @@ while 1 == 1:
             else:
                 logger.error("Video: " + song.artist + " - " + song.name + " - failed.")
 
-    time.sleep(int(os.environ.get("TIME_SLEEP")))
+    time.sleep(int(os.environ.get("TIME_SLEEP", "30")))
